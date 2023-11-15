@@ -79,6 +79,9 @@ pub struct Resolver<O = TokioFileOpener> {
     ///
     /// See `set_rewrite` for a convenience setter that simplifies these types.
     pub rewrite: Option<Arc<dyn (Fn(ResolveParams) -> BoxRewriteFuture) + Send + Sync>>,
+
+    /// Only serve this type of files, and also will try file without extension.
+    pub file_extension: Option<&'static str>,
 }
 
 /// Future returned by a rewrite function. See `Resolver::set_rewrite`.
@@ -143,6 +146,7 @@ impl<O: FileOpener> Resolver<O> {
             opener: Arc::new(opener),
             allowed_encodings: AcceptEncoding::none(),
             rewrite: None,
+            file_extension: None,
         }
     }
 
@@ -166,6 +170,12 @@ impl<O: FileOpener> Resolver<O> {
     {
         self.rewrite = Some(Arc::new(move |params| Box::pin(rewrite(params))));
         self
+    }
+
+    /// Set up the file type by extension for resolving, it also will try to resolve the path
+    /// without extensions with this file type
+    pub fn set_extension(&mut self, extension: &'static str) {
+        self.file_extension = Some(extension);
     }
 
     /// Resolve the request by trying to find the file in the root.
@@ -207,7 +217,7 @@ impl<O: FileOpener> Resolver<O> {
         accept_encoding: AcceptEncoding,
     ) -> IoResult<ResolveResult<O::File>> {
         // Sanitize input path.
-        let requested_path = RequestedPath::resolve(request_path);
+        let requested_path = RequestedPath::resolve(request_path, self.file_extension);
 
         // Apply optional rewrite.
         let ResolveParams {
@@ -326,6 +336,7 @@ impl<O> Clone for Resolver<O> {
             opener: self.opener.clone(),
             allowed_encodings: self.allowed_encodings,
             rewrite: self.rewrite.clone(),
+            file_extension: self.file_extension.clone()
         }
     }
 }
