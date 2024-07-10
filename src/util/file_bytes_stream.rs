@@ -259,3 +259,74 @@ impl<F: FileAccess> Stream for FileBytesStreamMultiRange<F> {
         Pin::new(file_range).poll_next(cx)
     }
 }
+
+/// Wraps a `FileAccess` and implements a stream of `Bytes`s providing from multi-files
+/// contents in HTTP chunked transfer encoding.
+pub struct MultiFileBytesStream<F = TokioFileAccess> {
+    files: Vec<FileBytesStream<F>>,
+    index: Option<usize>,
+    completed: bool,
+    header: Bytes,
+    sep: Bytes,
+    footer: Bytes,
+}
+
+impl<F> MultiFileBytesStream<F> {
+    /// Create a new stream from the given files
+    pub fn new(files: Vec<F>, header: &'static str, sep: &'static str, footer: &'static str) -> Self {
+        Self {
+            files: files.into_iter().map(|f| FileBytesStream::new(f)).collect(),
+            index: None,
+            completed: false,
+            header: Bytes::from(header),
+            sep: Bytes::from(sep),
+            footer: Bytes::from(footer),
+        }
+    }
+}
+
+impl<F: FileAccess> Stream for MultiFileBytesStream<F> {
+    type Item = Result<Bytes, IoError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        let Self {
+            ref mut files,
+            ref mut index,
+            ref mut completed,
+            ref header,
+            ref sep,
+            ref footer,
+        } = *self;
+
+        match (*index, *completed) {
+            (_, true) => {
+                return Poll::Ready(None)
+            }
+            (None, false) => {
+                *index = Some(0);
+                return Poll::Ready(Some(Ok(header.clone())));
+            }
+            (Some(i), false) => {
+                if i == files.len() {
+                    *completed = true;
+                    return Poll::Ready(Some(Ok(footer.clone())));
+
+                } else {
+                    match Pin::new(&mut files[i]).poll_next(cx) {
+                        Poll::Ready(Some(b)) => {
+                            return Poll::Ready(Some(b));
+                        },
+                        Poll::Pending => {
+                            return Poll::Pending
+                        },
+                        Poll::Ready(None) => {
+                            *index = Some(i + 1);
+                            return Poll::Ready(Some(Ok(sep.clone())));
+                        }
+                    }
+                }
+            },
+        }
+    }
+}
+

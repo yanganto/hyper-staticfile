@@ -8,7 +8,7 @@ use futures_util::stream::Stream;
 use hyper::body::{Bytes, Frame};
 
 use crate::{
-    util::{FileBytesStream, FileBytesStreamMultiRange, FileBytesStreamRange},
+    util::{FileBytesStream, FileBytesStreamMultiRange, FileBytesStreamRange, MultiFileBytesStream},
     vfs::{FileAccess, TokioFileAccess},
 };
 
@@ -22,6 +22,8 @@ pub enum Body<F = TokioFileAccess> {
     Range(FileBytesStreamRange<F>),
     /// Serve multiple ranges from a file.
     MultiRange(FileBytesStreamMultiRange<F>),
+    /// Serve from multiple files
+    MultiFiles(MultiFileBytesStream<F>)
 }
 
 impl<F: FileAccess> hyper::body::Body for Body<F> {
@@ -37,6 +39,7 @@ impl<F: FileAccess> hyper::body::Body for Body<F> {
             Body::Full(ref mut stream) => Pin::new(stream).poll_next(cx),
             Body::Range(ref mut stream) => Pin::new(stream).poll_next(cx),
             Body::MultiRange(ref mut stream) => Pin::new(stream).poll_next(cx),
+            Body::MultiFiles(ref mut stream) => Pin::new(stream).poll_next(cx),
         });
         Poll::Ready(opt.map(|res| res.map(Frame::data)))
     }

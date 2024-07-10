@@ -86,13 +86,48 @@ impl<O: FileOpener> Static<O> {
     ///
     /// This supports to response `file.html` when request on `/path/to/file`, `/path/to/file.htm`,
     /// or `/path/to/file.html`.
-    pub async fn serve_files_by_extension<B>(
+    pub async fn serve_file_by_extension<B>(
         mut self,
         request: Request<B>,
         file_extension: &'static str,
     ) -> Result<Response<Body<<O::File as IntoFileAccess>::Output>>, IoError> {
         self.resolver.set_extension(file_extension);
         self.serve(request).await
+    }
+
+    /// Merge multiple static files 
+    pub async fn serve_files_by_extension<B>(
+        mut self,
+        request: Request<B>,
+        files: Vec<String>,
+        header: &'static str,
+        sep: &'static str,
+        footer: &'static str,
+        file_extension: &'static str,
+    ) -> Result<Response<Body<<O::File as IntoFileAccess>::Output>>, IoError> {
+        self.resolver.set_extension(file_extension);
+        let Self {
+            resolver,
+            cache_headers,
+        } = self;
+
+        let accept_encoding = request
+                .headers()
+                .get(http::header::ACCEPT_ENCODING)
+                .map(AcceptEncoding::from_header_value)
+                .unwrap_or(AcceptEncoding::none());
+        let mut results = Vec::new();
+        for file in files {
+            if let Ok(r) = resolver.resolve_path(&file, accept_encoding).await {
+                results.push(r);
+            }
+        }
+
+        Ok(ResponseBuilder::new()
+            .request(&request)
+            .cache_headers(cache_headers)
+            .build_from_multi_results(results, header, sep, footer)
+            .expect("unable to build response"))
     }
 }
 

@@ -8,7 +8,7 @@ use http_range::{HttpRange, HttpRangeParseError};
 use rand::prelude::{thread_rng, SliceRandom};
 
 use crate::{
-    util::{FileBytesStream, FileBytesStreamMultiRange, FileBytesStreamRange},
+    util::{FileBytesStream, FileBytesStreamMultiRange, FileBytesStreamRange, MultiFileBytesStream},
     vfs::IntoFileAccess,
     Body, ResolvedFile,
 };
@@ -270,6 +270,34 @@ impl FileResponseBuilder {
                 file.handle.into_file_access(),
                 file.size,
             )))
+    }
+
+    /// Build a response for the given resolved file.
+    pub fn build_from_multi_files<F: IntoFileAccess>(
+        &self,
+        files: Vec<ResolvedFile<F>>,
+        header: &'static str,
+        sep: &'static str,
+        footer: &'static str,
+    ) -> Result<Response<Body<F::Output>>> {
+        let mut res = ResponseBuilder::new();
+        let size: u64  = files.iter().map(|f| f.size).sum::<u64>() 
+            + header.len() as u64
+            + (sep.len() * (files.len() - 1)) as u64
+            + footer.len() as u64;
+
+        res = res.header(header::CONTENT_LENGTH, format!("{}", size));
+
+        if let Some(content_type) = &files[0].content_type {
+            res = res.header(header::CONTENT_TYPE, content_type);
+        }
+        if let Some(encoding) = &files[0].encoding {
+            res = res.header(header::CONTENT_ENCODING, encoding.to_header_value());
+        }
+
+        // Stream the body.
+        res.status(StatusCode::OK)
+            .body(Body::MultiFiles(MultiFileBytesStream::new(files.into_iter().map(|file|file.handle.into_file_access()).collect(), header, sep, footer)))
     }
 }
 

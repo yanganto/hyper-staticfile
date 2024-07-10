@@ -104,4 +104,21 @@ impl<'a> ResponseBuilder<'a> {
             ResolveResult::Found(file) => self.file_response_builder.build(file),
         }
     }
+
+    /// Build a response for multiple `resolve` result.
+    pub fn build_from_multi_results<F: IntoFileAccess>(
+        &self,
+        results: Vec<ResolveResult<F>>,
+        header: &'static str,
+        sep: &'static str,
+        footer: &'static str
+    ) -> Result<Response<Body<F::Output>>> {
+        let mut files = Vec::new();
+        for result in results {
+            if let ResolveResult::Found(file) = result {
+                files.push(file);
+            }
+        }
+        self.file_response_builder.build_from_multi_files(files, header, sep, footer)
+    }
 }
