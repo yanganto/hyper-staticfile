@@ -234,7 +234,7 @@ async fn changes_content_type_on_extension_js() {
     assert_eq!(
         res.headers().get(header::CONTENT_TYPE),
         Some(&header::HeaderValue::from_static(
-            "text/javascript; charset=utf-8"
+            "application/javascript; charset=utf-8"
         ))
     );
 }
