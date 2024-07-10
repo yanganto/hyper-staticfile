@@ -16,7 +16,7 @@ futures-util = "0.3.1"
 http = "1.0.0"
 httpdate = "1.0.1"
 http-range = "0.1.4"
-hyper = "1.0.0"
+hyper = "1.4.1"
 mime_guess = "2.0.1"
 percent-encoding = "2.1.0"
 rand = "0.8.4"
@@ -24,8 +24,8 @@ tokio = { version = "1.0.0", features = ["fs"] }
 url = "2.1.0"
 
 [dev-dependencies]
-hyper = { version = "1.0.0", features = ["http1", "server"] }
-hyper-util = { version = "0.1.1", features = ["tokio"] }
+hyper = { version = "1.4.1", features = ["http1", "server"] }
+hyper-util = { version = "0.1.6", features = ["tokio"] }
 http-body-util = "0.1.0"
 tempfile = "3"
 tokio = { version = "1.0.0", features = ["macros", "rt-multi-thread", "net", "io-util"] }
